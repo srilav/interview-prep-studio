@@ -20,7 +20,7 @@ A self-study application for technical interviews. Look up a topic, get an expla
 - **Frontend:** React + TypeScript (Vite), Connect-Web gRPC-Web client, STOMP over WebSocket
 - **Backend:** Java 21, Spring Boot, gRPC (behind Envoy for gRPC-Web), modular monolith organised by bounded context
 - **Events:** transactional outbox relayed to Kafka
-- **Storage:** PostgreSQL, Redis
+- **Storage:** PostgreSQL (Redis planned for scaling WebSocket fan-out)
 - **LLM:** Claude Haiku 5.5 (`claude-haiku-5-5`) via the Anthropic Java SDK, behind an anti-corruption layer
 
 ## Prototype
