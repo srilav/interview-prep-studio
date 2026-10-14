@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Prep Studio</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: three-pane content studio (taxonomy tree → key list → key editor), stacks to one column on phones */
+:root {
+  --bg: #F3F6F5; --surface: #FFFFFF; --sunken: #EAF0EE; --line: #D3DDD9; --fg: #16201D; --muted: #586A64;
+  --accent: #0E6E66; --accent-ink: #FFFFFF; --accent-soft: #DCEFEB;
+  --ok: #1D7540; --ok-soft: #E0F2E6; --warn: #8F5600; --warn-soft: #FBEED6; --info: #2B58A3; --info-soft: #E2EAF8;
+  --danger: #B42318; --danger-soft: #FBE3E0; --code-bg: #12201C; --code-fg: #D5E6E0;
+  --f-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --f-body: "Instrument Sans", "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --r: 8px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1412; --surface: #151D1A; --sunken: #1B2521; --line: #2A3732; --fg: #E2EBE8; --muted: #94A6A0;
+    --accent: #52C2B6; --accent-ink: #052320; --accent-soft: #163A35;
+    --ok: #6CCB8C; --ok-soft: #163322; --warn: #E8B04F; --warn-soft: #382A12; --info: #8FB3F0; --info-soft: #1A2943;
+    --danger: #F0867B; --danger-soft: #3B1A17; --code-bg: #09100E; --code-fg: #D5E6E0; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1412; --surface: #151D1A; --sunken: #1B2521; --line: #2A3732; --fg: #E2EBE8; --muted: #94A6A0;
+  --accent: #52C2B6; --accent-ink: #052320; --accent-soft: #163A35;
+  --ok: #6CCB8C; --ok-soft: #163322; --warn: #E8B04F; --warn-soft: #382A12; --info: #8FB3F0; --info-soft: #1A2943;
+  --danger: #F0867B; --danger-soft: #3B1A17; --code-bg: #09100E; --code-fg: #D5E6E0; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 15px/1.5 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px 32px; }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px 24px; max-width: 1440px; margin: 0 auto 16px; }
+.brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.brand h1 { font-size: 1.5rem; letter-spacing: -0.01em; }
+.brand span { color: var(--muted); }
+.mock-note { font-size: .8rem; color: var(--muted); background: var(--sunken); border: 1px dashed var(--line); padding: 4px 10px; border-radius: 999px; }
+
+.studio { display: grid; gap: 16px; max-width: 1440px; margin: 0 auto; grid-template-columns: 1fr; }
+@media (min-width: 1080px) { .studio { grid-template-columns: 270px 340px minmax(0, 1fr); align-items: start; } }
+.pane { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); min-width: 0; display: flex; flex-direction: column; }
+.pane-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.pane-head h2 { font-size: 1.05rem; }
+.eyebrow { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 2px; }
+
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 6px 12px; cursor: pointer; font-weight: 500; font-size: .875rem; white-space: nowrap; }
+.btn:hover { background: var(--sunken); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--accent); }
+.btn.ghost:hover { background: var(--accent-soft); }
+.btn.danger { color: var(--danger); border-color: var(--danger-soft); }
+.btn.danger:hover { background: var(--danger-soft); }
+.btn.danger-solid { background: var(--danger); border-color: var(--danger); color: var(--surface); }
+.btn.ai { border-color: var(--accent); color: var(--accent); }
+.btn.ai:hover { background: var(--accent-soft); }
+
+/* Tree */
+.tree { padding: 8px; display: grid; gap: 2px; }
+.trow { display: flex; align-items: center; gap: 4px; border-radius: 6px; }
+.trow:hover { background: var(--sunken); }
+.trow > .tmain { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; border: 0; background: none; padding: 6px 8px; text-align: left; cursor: pointer; border-radius: 6px; }
+.tname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chev { width: 14px; color: var(--muted); flex: none; font-size: .75rem; }
+.lvl-p .tname { font-weight: 600; }
+.lvl-c { padding-left: 18px; }
+.lvl-s { padding-left: 40px; }
+.lvl-s .tmain { color: var(--fg); }
+.trow.selected { background: var(--accent-soft); }
+.trow.selected .tmain { color: var(--accent); font-weight: 600; }
+.kind { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; flex: none; }
+.count { margin-left: auto; font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+.tadd { border: 0; background: none; color: var(--muted); cursor: pointer; border-radius: 5px; width: 26px; height: 26px; flex: none; font-size: 1rem; line-height: 1; }
+.tadd:hover { color: var(--accent); background: var(--surface); }
+.inline-add { display: grid; gap: 6px; padding: 8px; margin: 2px 0 6px; border: 1px solid var(--accent); border-radius: 6px; background: var(--surface); }
+.inline-add .row { display: flex; gap: 6px; flex-wrap: wrap; }
+.inline-add input, .inline-add select { flex: 1; min-width: 0; }
+.inline-add label { font-size: .75rem; color: var(--muted); }
+.tree-legend { padding: 10px 16px 14px; border-top: 1px solid var(--line); font-size: .78rem; color: var(--muted); display: grid; gap: 2px; }
+
+/* Inputs */
+input[type=text], input[type=search], select, textarea { width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 7px 10px; }
+textarea { resize: vertical; }
+input:focus, select:focus, textarea:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+.err { color: var(--danger); font-size: .78rem; margin: 0; }
+
+/* Key list */
+.list-tools { padding: 12px 16px 8px; display: grid; gap: 10px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 2px 10px; font-size: .8rem; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--fg); color: var(--surface); border-color: var(--fg); }
+.keys { list-style: none; margin: 0; padding: 4px 8px 12px; display: grid; gap: 4px; }
+.key-item { width: 100%; text-align: left; border: 1px solid transparent; background: none; border-radius: 6px; padding: 10px; cursor: pointer; display: grid; gap: 4px; }
+.key-item:hover { background: var(--sunken); }
+.key-item.selected { border-color: var(--accent); background: var(--accent-soft); }
+.key-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.key-term { font-weight: 600; font-family: var(--f-mono); font-size: .9rem; }
+.key-def { color: var(--muted); font-size: .85rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.empty { padding: 24px 16px; color: var(--muted); text-align: center; font-size: .9rem; }
+
+.pill { font-size: .7rem; font-weight: 600; border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+.st-Draft { background: var(--warn-soft); color: var(--warn); }
+.st-In-review { background: var(--info-soft); color: var(--info); }
+.st-Published { background: var(--ok-soft); color: var(--ok); }
+.diff { font-size: .7rem; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 0 7px; }
+
+/* Editor */
+.tabs { display: flex; gap: 4px; background: var(--sunken); padding: 3px; border-radius: 7px; }
+.tab { border: 0; background: none; padding: 5px 12px; border-radius: 5px; cursor: pointer; font-size: .85rem; font-weight: 500; color: var(--muted); }
+.tab[aria-selected="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.editor { padding: 16px; display: grid; gap: 16px; }
+.grid2 { display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 720px) { .grid2 { grid-template-columns: 1fr 1fr; } }
+.field { display: grid; gap: 5px; min-width: 0; }
+.field > label, .field > .lbl { font-size: .82rem; font-weight: 600; }
+.req { color: var(--danger); }
+.hint { font-size: .76rem; color: var(--muted); margin: 0; display: flex; justify-content: space-between; gap: 8px; }
+.hint .over { color: var(--danger); font-weight: 600; }
+.code-input { font-family: var(--f-mono); font-size: .82rem; background: var(--code-bg); color: var(--code-fg); border-color: var(--code-bg); line-height: 1.55; tab-size: 4; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg label { flex: 1; text-align: center; padding: 6px 4px; cursor: pointer; font-size: .85rem; border-left: 1px solid var(--line); }
+.seg label:first-child { border-left: 0; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label:has(input:checked) { background: var(--fg); color: var(--surface); font-weight: 600; }
+.seg label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-top: 8px; border-top: 1px solid var(--line); }
+.actions .spacer { flex: 1; }
+.confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--danger-soft); color: var(--danger); padding: 6px 10px; border-radius: 6px; font-size: .85rem; }
+.ai-banner { background: var(--accent-soft); color: var(--fg); border-radius: 6px; padding: 8px 12px; font-size: .84rem; }
+.ai-banner strong { color: var(--accent); }
+.edit-crumb { font-size: .8rem; color: var(--muted); }
+
+/* Learner preview */
+.preview { padding: 24px 20px 28px; display: grid; gap: 16px; max-width: 760px; }
+.preview .pcrumb { font-size: .8rem; color: var(--muted); }
+.preview h3 { font-size: 2rem; font-family: var(--f-mono); font-weight: 500; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.preview .aka { color: var(--muted); font-size: .88rem; }
+.preview .lede { font-size: 1.1rem; line-height: 1.55; max-width: 62ch; margin: 0; }
+.preview .body { max-width: 65ch; margin: 0; color: var(--fg); white-space: pre-wrap; }
+.preview h4 { margin: 8px 0 0; font-size: .75rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-family: var(--f-body); }
+.codeblock { background: var(--code-bg); color: var(--code-fg); border-radius: 8px; padding: 14px 16px; font: .84rem/1.6 var(--f-mono); overflow-x: auto; margin: 0; }
+.rel { display: flex; gap: 6px; flex-wrap: wrap; }
+.rel span { font-family: var(--f-mono); font-size: .8rem; background: var(--sunken); border-radius: 4px; padding: 2px 8px; }
+.prow { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--surface); padding: 8px 16px; border-radius: 6px; font-size: .88rem; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: calc(100% - 32px); }
+.toast.show { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+
+<header class="top">
+  <div class="brand">
+    <h1>Prep Studio</h1>
+    <span>Content admin · Keys &amp; definitions</span>
+  </div>
+  <span class="mock-note">Design prototype · sample data · changes reset on reload</span>
+</header>
+
+<main class="studio">
+  <section class="pane" aria-labelledby="tree-h">
+    <div class="pane-head">
+      <h2 id="tree-h">Taxonomy</h2>
+      <button class="btn ghost" id="add-platform" type="button">+ Language / platform</button>
+    </div>
+    <div class="tree" id="tree"></div>
+    <div class="tree-legend">
+      <span>Language / platform › Category › Subcategory</span>
+      <span>Use + on a row to add a child.</span>
+    </div>
+  </section>
+
+  <section class="pane" aria-labelledby="keys-title">
+    <div class="pane-head">
+      <div style="min-width:0">
+        <p class="eyebrow" id="keys-crumb"></p>
+        <h2 id="keys-title"></h2>
+      </div>
+      <button class="btn primary" id="new-key" type="button">+ New key</button>
+    </div>
+    <div class="list-tools">
+      <input type="search" id="key-search" placeholder="Search keys and aliases" aria-label="Search keys">
+      <div class="chips" id="status-chips" role="group" aria-label="Filter by status"></div>
+    </div>
+    <ul class="keys" id="keys"></ul>
+  </section>
+
+  <section class="pane" aria-label="Key editor">
+    <div class="pane-head">
+      <div style="min-width:0">
+        <p class="eyebrow" id="edit-mode">Editing key</p>
+        <div class="edit-crumb" id="edit-crumb"></div>
+      </div>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" id="tab-edit" aria-selected="true" type="button">Edit</button>
+        <button class="tab" role="tab" id="tab-preview" aria-selected="false" type="button">Learner preview</button>
+      </div>
+    </div>
+
+    <form class="editor" id="editor" novalidate>
+      <div class="ai-banner" id="ai-banner" hidden></div>
+      <div class="grid2">
+        <div class="field">
+          <label for="f-term">Key (term) <span class="req">*</span></label>
+          <input type="text" id="f-term" placeholder="e.g. ConcurrentHashMap" autocomplete="off">
+          <p class="err" id="e-term" hidden></p>
+        </div>
+        <div class="field">
+          <label for="f-aliases">Aliases</label>
+          <input type="text" id="f-aliases" placeholder="Comma separated, e.g. CHM, java.util.concurrent.ConcurrentHashMap">
+          <p class="hint">Learners can find the key by any alias.</p>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="f-short">Short definition <span class="req">*</span></label>
+        <textarea id="f-short" rows="2" placeholder="One or two sentences a candidate could say out loud in an interview."></textarea>
+        <p class="hint"><span>Shown in search results and flashcards.</span><span id="short-count">0 / 280</span></p>
+        <p class="err" id="e-short" hidden></p>
+      </div>
+
+      <div class="field">
+        <label for="f-detail">Detailed explanation</label>
+        <textarea id="f-detail" rows="5" placeholder="How it works, trade-offs, complexity, common pitfalls. Markdown supported."></textarea>
+      </div>
+
+      <div class="field">
+        <label for="f-code">Java example</label>
+        <textarea id="f-code" class="code-input" rows="7" spellcheck="false" placeholder="// Compilable Java 21 snippet"></textarea>
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <span class="lbl" id="diff-lbl">Difficulty</span>
+          <div class="seg" role="radiogroup" aria-labelledby="diff-lbl">
+            <label><input type="radio" name="difficulty" id="d-easy" value="Easy">Easy</label>
+            <label><input type="radio" name="difficulty" id="d-medium" value="Medium">Medium</label>
+            <label><input type="radio" name="difficulty" id="d-hard" value="Hard">Hard</label>
+          </div>
+        </div>
+        <div class="field">
+          <label for="f-status">Status</label>
+          <select id="f-status">
+            <option>Draft</option><option>In review</option><option>Published</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-tags">Tags</label>
+          <input type="text" id="f-tags" placeholder="Comma separated">
+        </div>
+        <div class="field">
+          <label for="f-related">Related keys</label>
+          <input type="text" id="f-related" placeholder="Comma separated key names">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="f-place">Placement <span class="req">*</span></label>
+        <select id="f-place"></select>
+        <p class="hint">Language / platform › Category › Subcategory. Change it to move the key.</p>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" type="submit" id="save">Save key</button>
+        <button class="btn ai" type="button" id="ai-draft">Draft with Haiku</button>
+        <span class="spacer"></span>
+        <button class="btn danger" type="button" id="delete">Delete</button>
+        <div class="confirm" id="confirm" hidden>
+          <span id="confirm-text">Delete this key?</span>
+          <button class="btn danger-solid" type="button" id="confirm-yes">Delete</button>
+          <button class="btn" type="button" id="confirm-no">Keep</button>
+        </div>
+      </div>
+    </form>
+
+    <article class="preview" id="preview" hidden></article>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+const K = (term, o) => ({ id: 'k' + Math.random().toString(36).slice(2, 9), term, aliases: [], detail: '', code: '', tags: [], related: [], ...o });
+
+const data = [
+  { id: 'p-java', name: 'Java', kind: 'Language', cats: [
+    { id: 'c-coll', name: 'Collections', subs: [
+      { id: 's-map', name: 'Map', keys: [
+        K('HashMap', { aliases: ['java.util.HashMap'], difficulty: 'Medium', status: 'Published', tags: ['hashing', 'collections'], related: ['ConcurrentHashMap', 'equals/hashCode contract'],
+          short: "A hash-table implementation of Map that stores key-value pairs in buckets indexed by the key's hashCode(), giving average O(1) get and put.",
+          detail: "Keys are hashed, spread, and mapped to one of 2^n buckets. Collisions chain in a linked list; since Java 8 a bucket with 8 or more entries (and a table of at least 64) becomes a red-black tree, so the worst case is O(log n).\n\nWhen size exceeds capacity × load factor (default 0.75) the table doubles and entries are rehashed. HashMap is not thread-safe and allows one null key.",
+          code: `Map<String, Integer> wordCount = new HashMap<>();
+for (String w : "to be or not to be".split(" ")) {
+    wordCount.merge(w, 1, Integer::sum);
+}
+System.out.println(wordCount); // e.g. {not=1, be=2, or=1, to=2}, order not guaranteed` }),
+        K('ConcurrentHashMap', { aliases: ['CHM'], difficulty: 'Hard', status: 'In review', tags: ['concurrency', 'collections'], related: ['HashMap', 'LongAdder'],
+          short: 'A thread-safe Map that allows concurrent reads and fine-grained locked writes without locking the whole table.',
+          detail: "Reads are lock-free. Writes use CAS on empty bins and synchronize on the first node of a bin otherwise, so threads updating different bins don't block each other.\n\nNull keys and values are not allowed, because null would be ambiguous in a concurrent get(). Iterators are weakly consistent and never throw ConcurrentModificationException.",
+          code: `ConcurrentMap<String, LongAdder> hits = new ConcurrentHashMap<>();
+hits.computeIfAbsent("/home", k -> new LongAdder()).increment();` }),
+        K('TreeMap', { difficulty: 'Easy', status: 'Draft', tags: ['sorting'], related: ['NavigableMap'],
+          short: 'A sorted Map backed by a red-black tree; keys stay in natural or Comparator order with O(log n) operations.',
+          detail: 'Implements NavigableMap, so it supports range queries such as floorKey, ceilingKey, headMap and tailMap. Useful for interval scheduling and leaderboards.',
+          code: `TreeMap<Integer, String> slots = new TreeMap<>(Map.of(9, "standup", 13, "review", 16, "1:1"));
+System.out.println(slots.floorEntry(14)); // 13=review` })
+      ]},
+      { id: 's-list', name: 'List', keys: [
+        K('ArrayList', { difficulty: 'Easy', status: 'Published', tags: ['arrays'], related: ['LinkedList'],
+          short: 'A resizable-array implementation of List with O(1) random access and amortized O(1) appends.',
+          detail: 'Backed by an Object[] that grows by about 1.5x when full. Inserting or removing in the middle shifts elements, which is O(n). In practice it beats LinkedList for almost every workload because of cache locality.',
+          code: `List<String> names = new ArrayList<>(List.of("Ada", "Linus"));
+names.add(1, "Grace"); // shifts "Linus" right` })
+      ]}
+    ]},
+    { id: 'c-conc', name: 'Concurrency', subs: [
+      { id: 's-jmm', name: 'Memory model', keys: [
+        K('volatile', { difficulty: 'Medium', status: 'Published', tags: ['visibility'], related: ['happens-before', 'AtomicInteger'],
+          short: 'A field modifier that guarantees writes are visible to other threads and prevents reordering around the access.',
+          detail: 'A write to a volatile field happens-before every later read of that field. It does not make compound actions such as count++ atomic; use AtomicInteger or a lock for that.\n\nTypical uses: a stop flag, or the instance field in double-checked locking.',
+          code: `private volatile boolean running = true;
+
+public void run() {
+    while (running) { doWork(); }
+}
+
+public void stop() { running = false; }` }),
+        K('happens-before', { difficulty: 'Hard', status: 'Draft', tags: ['jmm'], related: ['volatile', 'synchronized'],
+          short: "The Java Memory Model rule that defines when one action's effects are guaranteed to be visible to another.",
+          detail: 'Edges come from program order, monitor unlock → later lock, volatile write → later read, Thread.start() and Thread.join(). Two conflicting accesses not ordered by happens-before form a data race.' })
+      ]},
+      { id: 's-exec', name: 'Executors', keys: [
+        K('ThreadPoolExecutor', { difficulty: 'Hard', status: 'In review', tags: ['thread pools'], related: ['ExecutorService', 'BlockingQueue'],
+          short: 'The configurable thread pool behind the Executors factory methods, defined by core size, max size, a work queue and a rejection policy.',
+          detail: 'New tasks start core threads until corePoolSize is reached, then go to the queue. Only when the queue is full do extra threads start, up to maximumPoolSize. With an unbounded queue, maximumPoolSize is never used.\n\nRejection policies: AbortPolicy (default), CallerRunsPolicy, DiscardPolicy, DiscardOldestPolicy.',
+          code: `ExecutorService pool = new ThreadPoolExecutor(
+    4, 8, 60, TimeUnit.SECONDS,
+    new ArrayBlockingQueue<>(100),
+    new ThreadPoolExecutor.CallerRunsPolicy());` })
+      ]}
+    ]},
+    { id: 'c-jvm', name: 'JVM internals', subs: [
+      { id: 's-gc', name: 'Garbage collection', keys: [
+        K('G1 garbage collector', { aliases: ['G1GC', 'Garbage-First'], difficulty: 'Medium', status: 'Published', tags: ['gc', 'tuning'], related: ['ZGC', 'Heap regions'],
+          short: 'The default JVM collector since Java 9. It splits the heap into equal regions and collects the ones with the most garbage first.',
+          detail: 'G1 targets a pause-time goal (-XX:MaxGCPauseMillis, default 200 ms). Young collections evacuate eden and survivor regions; mixed collections also take old regions chosen by liveness. Humongous objects (at least half a region) get contiguous regions.',
+          code: `// JVM flags
+-XX:+UseG1GC -XX:MaxGCPauseMillis=100 -Xms4g -Xmx4g` })
+      ]}
+    ]}
+  ]},
+  { id: 'p-spring', name: 'Spring Boot', kind: 'Framework', cats: [
+    { id: 'c-core', name: 'Core container', subs: [
+      { id: 's-di', name: 'Dependency injection', keys: [
+        K('Bean scope', { aliases: ['@Scope'], difficulty: 'Easy', status: 'Published', tags: ['ioc'], related: ['ObjectProvider', 'Scoped proxy'],
+          short: 'Defines how many instances of a bean the Spring container creates and how long they live.',
+          detail: 'singleton (default, one per container), prototype (new instance per lookup), and the web scopes request, session and application. Injecting a prototype into a singleton yields a single instance unless you use ObjectProvider or a scoped proxy.',
+          code: `@Component
+@Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
+public class ReportBuilder { }` })
+      ]}
+    ]},
+    { id: 'c-data', name: 'Data access', subs: [
+      { id: 's-tx', name: 'Transactions', keys: [
+        K('Transaction propagation', { aliases: ['@Transactional(propagation)'], difficulty: 'Medium', status: 'Draft', tags: ['transactions'], related: ['Self-invocation', 'Savepoint'],
+          short: "Decides whether a transactional method joins the caller's transaction, starts a new one, or runs without one.",
+          detail: 'REQUIRED (default) joins or creates. REQUIRES_NEW suspends the outer transaction and commits independently, which suits audit logs. NESTED uses savepoints.\n\nSelf-invocation inside the same class bypasses the proxy, so the annotation has no effect.',
+          code: `@Transactional(propagation = Propagation.REQUIRES_NEW)
+public void writeAudit(AuditEntry entry) {
+    auditRepository.save(entry);
+}` })
+      ]}
+    ]}
+  ]},
+  { id: 'p-kafka', name: 'Apache Kafka', kind: 'Platform', cats: [
+    { id: 'c-msg', name: 'Messaging', subs: [
+      { id: 's-cons', name: 'Partitions & consumers', keys: [
+        K('Consumer group', { aliases: ['group.id'], difficulty: 'Medium', status: 'Published', tags: ['scaling'], related: ['Partition', 'Rebalance', 'Offset'],
+          short: 'A set of consumers sharing a group.id. Each partition of a topic is read by exactly one consumer in the group.',
+          detail: 'Adding consumers scales reads up to the partition count; extra consumers sit idle. Offsets are committed per group, so separate groups each receive every message. A rebalance reassigns partitions when members join or leave.',
+          code: `Properties props = new Properties();
+props.put(ConsumerConfig.GROUP_ID_CONFIG, "order-service");
+props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
+KafkaConsumer<String, String> consumer = new KafkaConsumer<>(props);
+consumer.subscribe(List.of("orders"));` })
+      ]}
+    ]}
+  ]}
+];
+
+const state = {
+  sel: { p: 'p-java', c: 'c-coll', s: 's-map', k: null },
+  open: new Set(['p-java', 'c-coll', 'c-conc']),
+  adding: null, filter: 'All', q: '', view: 'edit', isNew: false, aiDraft: false
+};
+state.sel.k = data[0].cats[0].subs[0].keys[0].id;
+
+const $ = s => document.querySelector(s);
+const h = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+const list = s => s.split(',').map(x => x.trim()).filter(Boolean);
+const P = id => data.find(p => p.id === id);
+const C = (p, id) => p?.cats.find(c => c.id === id);
+const S = (c, id) => c?.subs.find(s => s.id === id);
+const cur = () => { const p = P(state.sel.p), c = C(p, state.sel.c), s = S(c, state.sel.s); return { p, c, s, k: s?.keys.find(k => k.id === state.sel.k) }; };
+const statusCls = s => 'pill st-' + s.replace(' ', '-');
+const countCat = c => c.subs.reduce((n, s) => n + s.keys.length, 0);
+const countPlat = p => p.cats.reduce((n, c) => n + countCat(c), 0);
+
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2200); }
+
+/* ---------- Tree ---------- */
+function addForm(level, ids) {
+  const f = h('form', 'inline-add');
+  const label = { platform: 'New language / platform', category: 'New category', sub: 'New subcategory' }[level];
+  const lab = h('label', null, label); lab.htmlFor = 'new-node-name'; f.append(lab);
+  const row = h('div', 'row');
+  const inp = h('input'); inp.type = 'text'; inp.id = 'new-node-name';
+  inp.placeholder = { platform: 'e.g. Python, AWS, React', category: 'e.g. Streams API', sub: 'e.g. Collectors' }[level];
+  row.append(inp);
+  let kind;
+  if (level === 'platform') {
+    kind = h('select'); kind.id = 'new-node-kind'; kind.setAttribute('aria-label', 'Type');
+    ['Language', 'Framework', 'Platform', 'Tool'].forEach(k => kind.append(new Option(k)));
+    row.append(kind);
+  }
+  f.append(row);
+  const err = h('p', 'err'); err.hidden = true; f.append(err);
+  const btns = h('div', 'row');
+  const ok = h('button', 'btn primary', 'Add'); ok.type = 'submit';
+  const no = h('button', 'btn', 'Cancel'); no.type = 'button';
+  no.onclick = () => { state.adding = null; renderTree(); };
+  btns.append(ok, no); f.append(btns);
+  f.onkeydown = e => { if (e.key === 'Escape') no.click(); };
+  f.onsubmit = e => {
+    e.preventDefault();
+    const name = inp.value.trim();
+    const siblings = level === 'platform' ? data : level === 'category' ? P(ids.p).cats : C(P(ids.p), ids.c).subs;
+    if (!name) { err.textContent = 'Enter a name.'; err.hidden = false; inp.focus(); return; }
+    if (siblings.some(x => x.name.toLowerCase() === name.toLowerCase())) { err.textContent = `"${name}" already exists here.`; err.hidden = false; inp.focus(); return; }
+    const id = level[0] + '-' + Math.random().toString(36).slice(2, 8);
+    if (level === 'platform') { data.push({ id, name, kind: kind.value, cats: [] }); state.open.add(id); state.adding = { level: 'category', ids: { p: id } }; toast(`Added ${name}. Now add its first category.`); }
+    if (level === 'category') { P(ids.p).cats.push({ id, name, subs: [] }); state.open.add(id); state.adding = { level: 'sub', ids: { p: ids.p, c: id } }; toast(`Added category ${name}. Now add a subcategory.`); }
+    if (level === 'sub') { C(P(ids.p), ids.c).subs.push({ id, name, keys: [] }); state.adding = null; selectSub(ids.p, ids.c, id); toast(`Added subcategory ${name}.`); return; }
+    renderTree(); fillPlacement();
+  };
+  setTimeout(() => inp.focus(), 0);
+  return f;
+}
+
+function addBtn(label, onclick) { const b = h('button', 'tadd', '+'); b.type = 'button'; b.setAttribute('aria-label', label); b.title = label; b.onclick = onclick; return b; }
+
+function renderTree() {
+  const tree = $('#tree'); tree.innerHTML = '';
+  if (state.adding?.level === 'platform') tree.append(addForm('platform'));
+  data.forEach(p => {
+    const open = state.open.has(p.id);
+    const row = h('div', 'trow lvl-p');
+    const main = h('button', 'tmain'); main.type = 'button'; main.setAttribute('aria-expanded', open);
+    main.append(h('span', 'chev', open ? '▾' : '▸'), h('span', 'tname', p.name), h('span', 'kind', p.kind), h('span', 'count', countPlat(p)));
+    main.onclick = () => { open ? state.open.delete(p.id) : state.open.add(p.id); renderTree(); };
+    row.append(main, addBtn(`Add category to ${p.name}`, () => { state.open.add(p.id); state.adding = { level: 'category', ids: { p: p.id } }; renderTree(); }));
+    tree.append(row);
+    if (!open) return;
+    if (state.adding?.level === 'category' && state.adding.ids.p === p.id) tree.append(addForm('category', state.adding.ids));
+    if (!p.cats.length && !state.adding) tree.append(h('div', 'empty', 'No categories yet. Use + to add one.'));
+    p.cats.forEach(c => {
+      const copen = state.open.has(c.id);
+      const crow = h('div', 'trow lvl-c');
+      const cm = h('button', 'tmain'); cm.type = 'button'; cm.setAttribute('aria-expanded', copen);
+      cm.append(h('span', 'chev', copen ? '▾' : '▸'), h('span', 'tname', c.name), h('span', 'count', countCat(c)));
+      cm.onclick = () => { copen ? state.open.delete(c.id) : state.open.add(c.id); renderTree(); };
+      crow.append(cm, addBtn(`Add subcategory to ${c.name}`, () => { state.open.add(c.id); state.adding = { level: 'sub', ids: { p: p.id, c: c.id } }; renderTree(); }));
+      tree.append(crow);
+      if (!copen) return;
+      if (state.adding?.level === 'sub' && state.adding.ids.c === c.id) tree.append(addForm('sub', state.adding.ids));
+      c.subs.forEach(s => {
+        const srow = h('div', 'trow lvl-s' + (s.id === state.sel.s ? ' selected' : ''));
+        const sm = h('button', 'tmain'); sm.type = 'button';
+        if (s.id === state.sel.s) sm.setAttribute('aria-current', 'true');
+        sm.append(h('span', 'tname', s.name), h('span', 'count', s.keys.length));
+        sm.onclick = () => selectSub(p.id, c.id, s.id);
+        srow.append(sm); tree.append(srow);
+      });
+    });
+  });
+}
+
+function selectSub(p, c, s) {
+  state.sel = { p, c, s, k: null }; state.open.add(p); state.open.add(c);
+  const sub = S(C(P(p), c), s);
+  state.isNew = !sub.keys.length; state.sel.k = sub.keys[0]?.id ?? null;
+  state.q = ''; $('#key-search').value = '';
+  renderAll();
+}
+
+/* ---------- Key list ---------- */
+function renderChips() {
+  const box = $('#status-chips'); box.innerHTML = '';
+  const { s } = cur();
+  ['All', 'Draft', 'In review', 'Published'].forEach(st => {
+    const n = st === 'All' ? s.keys.length : s.keys.filter(k => k.status === st).length;
+    const b = h('button', 'chip', `${st} ${n}`); b.type = 'button';
+    b.setAttribute('aria-pressed', state.filter === st);
+    b.onclick = () => { state.filter = st; renderList(); renderChips(); };
+    box.append(b);
+  });
+}
+
+function renderList() {
+  const { p, c, s } = cur();
+  $('#keys-crumb').textContent = `${p.name} › ${c.name}`;
+  $('#keys-title').textContent = s.name;
+  const ul = $('#keys'); ul.innerHTML = '';
+  const q = state.q.toLowerCase();
+  const items = s.keys.filter(k => (state.filter === 'All' || k.status === state.filter) &&
+    (!q || k.term.toLowerCase().includes(q) || k.aliases.some(a => a.toLowerCase().includes(q))));
+  if (!s.keys.length) { ul.append(h('li', 'empty', `No keys in ${s.name} yet. Fill in the editor to add the first one.`)); return; }
+  if (!items.length) { ul.append(h('li', 'empty', 'No keys match this search or filter.')); return; }
+  items.forEach(k => {
+    const li = h('li');
+    const b = h('button', 'key-item' + (k.id === state.sel.k && !state.isNew ? ' selected' : '')); b.type = 'button';
+    const top = h('div', 'key-top');
+    top.append(h('span', 'key-term', k.term), h('span', statusCls(k.status), k.status), h('span', 'diff', k.difficulty));
+    b.append(top, h('div', 'key-def', k.short));
+    b.onclick = () => { state.sel.k = k.id; state.isNew = false; state.aiDraft = false; renderList(); loadEditor(); };
+    li.append(b); ul.append(li);
+  });
+}
+
+/* ---------- Editor ---------- */
+function fillPlacement() {
+  const sel = $('#f-place'); const val = sel.value; sel.innerHTML = '';
+  data.forEach(p => p.cats.forEach(c => {
+    if (!c.subs.length) return;
+    const g = document.createElement('optgroup'); g.label = `${p.name} › ${c.name}`;
+    c.subs.forEach(s => g.append(new Option(s.name, `${p.id}|${c.id}|${s.id}`)));
+    sel.append(g);
+  }));
+  sel.value = val || `${state.sel.p}|${state.sel.c}|${state.sel.s}`;
+}
+
+function setErr(id, msg) { const e = $(id); e.textContent = msg || ''; e.hidden = !msg; }
+
+function loadEditor() {
+  const { p, c, s, k } = cur();
+  const key = state.isNew || !k ? null : k;
+  $('#edit-mode').textContent = key ? 'Editing key' : 'New key';
+  $('#edit-crumb').textContent = `${p.name} › ${c.name} › ${s.name}`;
+  $('#f-term').value = key?.term ?? '';
+  $('#f-aliases').value = key?.aliases.join(', ') ?? '';
+  $('#f-short').value = key?.short ?? '';
+  $('#f-detail').value = key?.detail ?? '';
+  $('#f-code').value = key?.code ?? '';
+  $('#f-status').value = key?.status ?? 'Draft';
+  $('#f-tags').value = key?.tags.join(', ') ?? '';
+  $('#f-related').value = key?.related.join(', ') ?? '';
+  document.querySelector(`input[name=difficulty][value="${key?.difficulty ?? 'Medium'}"]`).checked = true;
+  fillPlacement(); $('#f-place').value = `${p.id}|${c.id}|${s.id}`;
+  $('#delete').hidden = !key; $('#confirm').hidden = true;
+  $('#ai-banner').hidden = !state.aiDraft;
+  setErr('#e-term'); setErr('#e-short');
+  updateCount(); renderPreview();
+}
+
+function updateCount() {
+  const n = $('#f-short').value.length; const el = $('#short-count');
+  el.textContent = `${n} / 280`; el.className = n > 280 ? 'over' : '';
+}
+
+function readForm() {
+  const [p, c, s] = $('#f-place').value.split('|');
+  return {
+    term: $('#f-term').value.trim(), aliases: list($('#f-aliases').value), short: $('#f-short').value.trim(),
+    detail: $('#f-detail').value.trim(), code: $('#f-code').value.replace(/\s+$/, ''),
+    difficulty: document.querySelector('input[name=difficulty]:checked').value, status: $('#f-status').value,
+    tags: list($('#f-tags').value), related: list($('#f-related').value), place: { p, c, s }
+  };
+}
+
+$('#editor').onsubmit = e => {
+  e.preventDefault();
+  const f = readForm();
+  const target = S(C(P(f.place.p), f.place.c), f.place.s);
+  const editingId = state.isNew ? null : state.sel.k;
+  let bad = false;
+  if (!f.term) { setErr('#e-term', 'Enter the key term.'); bad = true; }
+  else if (target.keys.some(k => k.id !== editingId && k.term.toLowerCase() === f.term.toLowerCase())) { setErr('#e-term', `"${f.term}" already exists in ${target.name}. Edit that key instead.`); bad = true; }
+  else setErr('#e-term');
+  if (!f.short) { setErr('#e-short', 'Add a short definition so the key shows in search.'); bad = true; }
+  else if (f.short.length > 280) { setErr('#e-short', `Shorten by ${f.short.length - 280} characters. Put the rest in the detailed explanation.`); bad = true; }
+  else setErr('#e-short');
+  if (f.status === 'Published' && !f.code && !bad) { toast('Tip: published keys read better with a Java example.'); }
+  if (bad) { (f.term ? $('#f-short') : $('#f-term')).focus(); return; }
+
+  const { place, ...fields } = f;
+  let key;
+  if (editingId) {
+    const { s } = cur(); const i = s.keys.findIndex(k => k.id === editingId);
+    key = Object.assign(s.keys[i], fields);
+    if (s !== target) { s.keys.splice(i, 1); target.keys.push(key); }
+  } else { key = K(f.term, fields); target.keys.push(key); }
+  state.sel = { ...place, k: key.id }; state.isNew = false; state.aiDraft = false;
+  state.open.add(place.p); state.open.add(place.c);
+  renderAll();
+  toast(editingId ? `Saved ${key.term}` : `Added ${key.term} to ${target.name}`);
+};
+
+$('#f-short').oninput = updateCount;
+['#f-term', '#f-aliases', '#f-short', '#f-detail', '#f-code', '#f-tags', '#f-related', '#f-status'].forEach(id => $(id).addEventListener('input', renderPreview));
+document.querySelectorAll('input[name=difficulty]').forEach(r => r.addEventListener('change', renderPreview));
+
+$('#new-key').onclick = () => { state.isNew = true; state.aiDraft = false; renderList(); loadEditor(); setView('edit'); $('#f-term').focus(); };
+
+$('#ai-draft').onclick = () => {
+  const term = $('#f-term').value.trim();
+  if (!term) { setErr('#e-term', 'Enter a term first, then Haiku can draft the rest.'); $('#f-term').focus(); return; }
+  const { p, s } = cur();
+  if (!$('#f-short').value.trim()) $('#f-short').value = `[Haiku draft] One-sentence definition of ${term} in the context of ${p.name} ${s.name}.`;
+  if (!$('#f-detail').value.trim()) $('#f-detail').value = `[Haiku draft] How ${term} works, its complexity and trade-offs, and the pitfalls interviewers probe.`;
+  if (!$('#f-code').value.trim()) $('#f-code').value = `// [Haiku draft] Compilable Java 21 example for ${term}`;
+  $('#f-status').value = 'Draft';
+  state.aiDraft = true;
+  const b = $('#ai-banner'); b.innerHTML = '';
+  b.append(h('strong', null, 'Draft from Haiku. '), document.createTextNode('In the app this streams over gRPC from claude-haiku-5-5 into empty fields only. Review it before you publish. Status was set to Draft.'));
+  b.hidden = false; updateCount(); renderPreview();
+};
+
+$('#delete').onclick = () => { $('#confirm-text').textContent = `Delete "${cur().k.term}"? This can't be undone.`; $('#confirm').hidden = false; $('#delete').hidden = true; $('#confirm-no').focus(); };
+$('#confirm-no').onclick = () => { $('#confirm').hidden = true; $('#delete').hidden = false; };
+$('#confirm-yes').onclick = () => {
+  const { s, k } = cur(); s.keys = s.keys.filter(x => x.id !== k.id);
+  state.sel.k = s.keys[0]?.id ?? null; state.isNew = !s.keys.length;
+  renderAll(); toast(`Deleted ${k.term}`);
+};
+
+/* ---------- Preview ---------- */
+function renderPreview() {
+  const f = readForm(); const a = $('#preview'); a.innerHTML = '';
+  const P0 = P(f.place.p), C0 = C(P0, f.place.c), S0 = S(C0, f.place.s);
+  a.append(h('div', 'pcrumb', `${P0?.name} › ${C0?.name} › ${S0?.name}`));
+  a.append(h('h3', null, f.term || 'Untitled key'));
+  const row = h('div', 'prow');
+  row.append(h('span', 'diff', f.difficulty), h('span', statusCls(f.status), f.status));
+  if (f.aliases.length) row.append(h('span', 'aka', 'Also: ' + f.aliases.join(', ')));
+  a.append(row);
+  a.append(h('p', 'lede', f.short || 'Short definition appears here.'));
+  if (f.detail) { a.append(h('h4', null, 'How it works')); a.append(h('p', 'body', f.detail)); }
+  if (f.code) { a.append(h('h4', null, 'Java example')); a.append(h('pre', 'codeblock', f.code)); }
+  if (f.related.length) { a.append(h('h4', null, 'Related keys')); const r = h('div', 'rel'); f.related.forEach(x => r.append(h('span', null, x))); a.append(r); }
+  if (f.tags.length) { a.append(h('h4', null, 'Tags')); const r = h('div', 'rel'); f.tags.forEach(x => r.append(h('span', null, '#' + x))); a.append(r); }
+}
+
+function setView(v) {
+  state.view = v;
+  $('#tab-edit').setAttribute('aria-selected', v === 'edit'); $('#tab-preview').setAttribute('aria-selected', v === 'preview');
+  $('#editor').hidden = v !== 'edit'; $('#preview').hidden = v !== 'preview';
+}
+$('#tab-edit').onclick = () => setView('edit');
+$('#tab-preview').onclick = () => { renderPreview(); setView('preview'); };
+
+$('#add-platform').onclick = () => { state.adding = { level: 'platform' }; renderTree(); };
+$('#key-search').oninput = e => { state.q = e.target.value; renderList(); };
+
+function renderAll() { renderTree(); renderChips(); renderList(); loadEditor(); }
+renderAll();
+</script>
+</html>
