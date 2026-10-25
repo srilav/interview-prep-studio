@@ -126,6 +126,58 @@ Pages behind a sign-in become `NEEDS_TEXT`, and the learner pastes the text inst
 
 Configuration that changes behaviour: `LLM_PROVIDER` (`claude` or `fake`), `ANTHROPIC_API_KEY`, `KAFKA_ENABLED`, `DATABASE_URL`, `ALLOWED_ORIGINS` (WebSocket origins).
 
+### What runs in Docker and what runs on the host
+
+```
+┌──────────────────────────── your machine ────────────────────────────┐
+│  host processes                       Docker (API repo's compose)     │
+│  ┌──────────────┐                     ┌───────────────────────────┐   │
+│  │ Vite :5173   │── gRPC-Web ───────► │ envoy        :8081, :9901 │   │
+│  └──────┬───────┘                     └─────────────┬─────────────┘   │
+│         │ WebSocket :8080                           │ host.docker.    │
+│         ▼                                           │ internal:9090   │
+│  ┌──────────────┐ ◄─────────────────── gRPC ────────┘                 │
+│  │ API (JVM)    │── JDBC localhost:5432 ─► ┌───────────────────────┐  │
+│  │ :9090, :8080 │                          │ postgres :5432        │  │
+│  └──────────────┘                          │ (volume pgdata)       │  │
+│  ┌──────────────┐── JDBC ────────────────► └───────────────────────┘  │
+│  │ Jobs :9091   │                          ┌───────────────────────┐  │
+│  └──────────────┘                          │ redpanda :19092       │  │
+│                                            │ (profile kafka only)  │  │
+│                                            └───────────────────────┘  │
+└───────────────────────────────────────────────────────────────────────┘
+```
+
+| Container (`docker compose ps`) | Image | Published ports | Notes |
+|---|---|---|---|
+| `interview-prep-studio-api-postgres-1` | `postgres:16.4` | 5432 | Database `prepstudio`, user and password `prepstudio`. Data survives restarts in the `pgdata` volume; `docker compose down -v` wipes it. |
+| `interview-prep-studio-api-envoy-1` | `envoyproxy/envoy:v1.31.2` | 8081, 9901 | Config mounted read-only from `infra/envoy/envoy.yaml`. The image also declares 10000, which is not published or used. |
+| `…-redpanda-1` | `redpandadata/redpanda:v24.2.7` | 19092 | Only with `--profile kafka`. |
+
+The API, Jobs and the web dev server run on the host, not in Docker. Envoy reaches the API through `host.docker.internal`, which compose maps to the host with `extra_hosts: host-gateway`.
+
+### How the web app reaches the API
+
+The web app does not configure Envoy; it only knows two URLs:
+
+| Variable | Default | Used for |
+|---|---|---|
+| `VITE_GRPC_WEB_URL` | `http://localhost:8081` (Envoy) | `src/lib/transport.ts` builds one `createGrpcWebTransport`, and `src/lib/clients.ts` creates a client per service on it: Catalog, TaxonomyAdmin, Learning, Discussion, Progress |
+| `VITE_WS_URL` | `ws://localhost:8080/ws` (the API itself) | STOMP discussion. It bypasses Envoy, because gRPC-Web cannot do bidirectional streaming. |
+
+Envoy is configured in the API repo, in `infra/envoy/envoy.yaml`:
+
+| Setting | Why |
+|---|---|
+| Listener `0.0.0.0:8081` | The browser's gRPC-Web endpoint |
+| `envoy.filters.http.grpc_web` | Translates gRPC-Web from the browser into gRPC over HTTP/2 |
+| `envoy.filters.http.cors`, origins starting `http://localhost` and `http://127.0.0.1` | Lets the page on :5173 call :8081. It allows the gRPC and Connect request headers and exposes `grpc-status`, `grpc-message` and `grpc-status-details-bin`, so the browser can read errors. |
+| Route `/` → cluster `prep_studio_api` at `host.docker.internal:9090`, HTTP/2 | Sends every service to the API |
+| `timeout: 0s`, `stream_idle_timeout: 0s`, `grpc_timeout_header_max: 0s` | Turns off the time limits so long explanation streams are not cut off |
+| Admin `:9901` | Envoy stats, clusters and config dump, for debugging |
+
+For production, the CORS origins, the upstream address (an API service name instead of `host.docker.internal`) and TLS all need changing.
+
 ## Built vs planned
 
 | From DESIGN.md | Status |
