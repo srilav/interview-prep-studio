@@ -309,7 +309,7 @@ Kafka topics per context (`catalog.events`, `learning.events`, `discussion.event
 
 ## 10. Cross-cutting
 
-- Local dev: docker-compose with Postgres, Redis, Redpanda, Envoy, Keycloak.
+- Local dev: docker-compose with Postgres, Envoy and Redpanda (Redpanda only with `--profile kafka`). Redis and Keycloak join it when WebSocket fan-out and Identity are built. See [ARCHITECTURE.md](ARCHITECTURE.md#what-runs-in-docker-and-what-runs-on-the-host).
 - Auth: JWT validated by a gRPC `ServerInterceptor`; STOMP `CONNECT` carries the token. Admin RPCs require an `editor` role.
 - Search: Postgres full-text (`tsvector`) on term, aliases and short definition.
 - Observability: OpenTelemetry across gRPC, events and LLM calls; log token usage.
