@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| Version | 1.0 (2026-10-25) |
+| Version | 1.1 (2026-10-28) |
+| Owner | @srilav: approves every spec change and every gap left open (see [§13](#13-change-process)) |
 | Status | Baseline: describes the system as built, with gaps called out |
 | Covers | interview-prep-studio-api, interview-prep-studio-web, interview-prep-studio-jobs |
 | Related | [ARCHITECTURE.md](ARCHITECTURE.md) (parts and flows), [DESIGN.md](DESIGN.md) (full design, including planned work) |
@@ -213,7 +214,7 @@ Test locations: `api-it` = `app/.../PrepStudioApiTest`, `KeyTest`, `PlatformTest
 | AC-30 | FR-14, NFR-3 | **When** an editor creates a platform, category, subcategory and published key **Then** the outbox contains `PlatformAdded`, `CategoryAdded`, `SubcategoryAdded`, `KeyCreated`, `KeyPublished` | Test · `api-it.editorBuildsTaxonomyAndPublishesAKeyThatLearnersCanFind` |
 | AC-31 | FR-14 | **Given** `KAFKA_ENABLED=true` **When** a key is published **Then** a record keyed by the key id arrives on `catalog.events` | **Gap** |
 | AC-32 | FR-15, NFR-4 | **Given** two editors load the same key **When** both save **Then** the second gets `ABORTED` ("Someone else changed this…") | **Gap** |
-| AC-33 | NFR-6 | **Given** `LLM_PROVIDER=fake` and Kafka off **When** `mvn test` runs **Then** all API tests pass | Test · the API suite (the test profile uses the fake LLM with Kafka off). There is no CI pipeline yet. |
+| AC-33 | NFR-6 | **Given** `LLM_PROVIDER=fake` and Kafka off **When** `mvn test` runs **Then** all API tests pass | Test · the API suite (the test profile uses the fake LLM with Kafka off), run by CI on every pull request. |
 | AC-34 | NFR-8 | **Given** an origin not in `ALLOWED_ORIGINS` **When** it opens the WebSocket **Then** the handshake is refused | **Gap** |
 | AC-35 | NFR-10 | **When** a module imports another context's `domain` package or repository **Then** the build fails | **Gap** (DESIGN.md plans ArchUnit) |
 | AC-36 | C3 | **Given** an empty Postgres **When** the API starts **Then** Flyway applies V1–V5 and the shipped keys are searchable | Test · every `api-it` run on H2; Manual on Postgres |
@@ -237,33 +238,35 @@ Test locations: `api-it` = `app/.../PrepStudioApiTest`, `KeyTest`, `PlatformTest
 
 ## 8. Traceability
 
-| Requirement | Acceptance criteria | Gaps |
-|---|---|---|
-| FR-1 Taxonomy | AC-01..04 | |
-| FR-2 Key editing | AC-05..09 | AC-07, AC-09 |
-| FR-3 Publishing | AC-10, AC-11 | AC-11 |
-| FR-4 Search | AC-11..13 | AC-11, AC-13 |
-| FR-5 Key page | AC-14 | |
-| FR-6 AI key draft | AC-15 | |
-| FR-7 Streamed explanation | AC-16, AC-20, AC-21 | AC-21 |
-| FR-8 Reuse | AC-17, AC-18 | |
-| FR-9 Explanation quality | AC-19 | |
-| FR-10 Threads | AC-23 | |
-| FR-11 Live messages | AC-25, AC-27 | AC-27 manual |
-| FR-12 AI tutor | AC-24..26 | |
-| FR-13 Activity summary | AC-28, AC-29 | AC-29 |
-| FR-14 Domain events | AC-30, AC-31 | AC-31 |
-| FR-15 Errors | AC-03, AC-06, AC-14, AC-22, AC-32 | AC-22, AC-32 |
-| FR-J1..J5 | AC-37..46 | AC-46 |
-| NFR-1, NFR-2 latency | none yet | needs a load test (§10) |
-| NFR-3 No lost events | AC-30 | crash test not automated |
-| NFR-4 No lost updates | AC-32 | AC-32 |
-| NFR-5 Cost control | AC-17, AC-20, AC-26 | |
-| NFR-6 Offline development | AC-33 | |
-| NFR-7 Jobs URL safety | AC-38, AC-39 | |
-| NFR-8 Origins | AC-34 | AC-34 |
-| NFR-9 Contract compatibility | none | add `buf breaking` to CI |
-| NFR-10 Module boundaries | AC-35 | AC-35 |
+| Requirement | Code area | Owner | Acceptance criteria | Gaps |
+|---|---|---|---|---|
+| FR-1 Taxonomy | api `catalog` | @srilav | AC-01..04 | |
+| FR-2 Key editing | api `catalog` | @srilav | AC-05..09 | AC-07, AC-09 |
+| FR-3 Publishing | api `catalog` | @srilav | AC-10, AC-11 | AC-11 |
+| FR-4 Search | api `catalog` | @srilav | AC-11..13 | AC-11, AC-13 |
+| FR-5 Key page | api `catalog`, web | @srilav | AC-14 | |
+| FR-6 AI key draft | api `catalog`, `ai-gateway` | @srilav | AC-15 | |
+| FR-7 Streamed explanation | api `learning` | @srilav | AC-16, AC-20, AC-21 | AC-21 |
+| FR-8 Reuse | api `learning` | @srilav | AC-17, AC-18 | |
+| FR-9 Explanation quality | api `learning` | @srilav | AC-19 | |
+| FR-10 Threads | api `discussion` | @srilav | AC-23 | |
+| FR-11 Live messages | api `discussion`, web | @srilav | AC-25, AC-27 | AC-27 manual |
+| FR-12 AI tutor | api `discussion`, `ai-gateway` | @srilav | AC-24..26 | |
+| FR-13 Activity summary | api `progress` | @srilav | AC-28, AC-29 | AC-29 |
+| FR-14 Domain events | api `shared-kernel`, `app` | @srilav | AC-30, AC-31 | AC-31 |
+| FR-15 Errors | api `app` | @srilav | AC-03, AC-06, AC-14, AC-22, AC-32 | AC-22, AC-32 |
+| FR-J1..J5 | jobs | @srilav | AC-37..46 | AC-46 |
+| NFR-1, NFR-2 latency | api | @srilav | none yet | needs a load test (§10) |
+| NFR-3 No lost events | api `shared-kernel` | @srilav | AC-30 | crash test not automated |
+| NFR-4 No lost updates | api `catalog` | @srilav | AC-32 | AC-32 |
+| NFR-5 Cost control | api `learning`, `discussion` | @srilav | AC-17, AC-20, AC-26 | |
+| NFR-6 Offline development | api | @srilav | AC-33 | |
+| NFR-7 Jobs URL safety | jobs | @srilav | AC-38, AC-39 | |
+| NFR-8 Origins | api `app` | @srilav | AC-34 | AC-34 |
+| NFR-9 Contract compatibility | api `proto` | @srilav | none | add `buf breaking` to CI |
+| NFR-10 Module boundaries | api | @srilav | AC-35 | AC-35 |
+
+The owner decides when a criterion is ambiguous, reviews changes to that area (enforced by `CODEOWNERS` in each repo), and is answerable for each open gap: it stays in this table with a reason until a test closes it.
 
 **Coverage:** 46 criteria · 33 automated (AC-23 only partly; AC-36 also checked by hand on Postgres) · 1 manual (AC-27) · **12 gaps**: AC-07, 09, 11, 13, 21, 22, 29, 31, 32, 34, 35, 46. NFR-1, NFR-2 and NFR-9 have no criteria yet.
 
@@ -293,8 +296,9 @@ The `.proto` files are the contract; this section lists them, it does not repeat
 | Application unit | Services with fakes: draft parsing, rate limit, matching, extraction | `KeyDraftServiceTest`, `TutorRateLimiterTest`, `CatalogMatcherTest`, `PostingExtractorTest`, `SkillNormalizerTest`, `HtmlTextExtractorTest`, `UrlGuardTest` |
 | Integration | Full Spring context, H2 in PostgreSQL mode, in-process gRPC, fake LLM | `PrepStudioApiTest`, `JobsGrpcServiceIntegrationTest` |
 | Web | Type-check only (`npm run typecheck`) | **Gap**: no component or end-to-end tests |
-| CI | **Gap**: no pipeline; tests run locally only | |
-| To add | CI running both suites and the web type-check, ArchUnit boundaries (AC-35), Testcontainers Postgres + Kafka (AC-31, AC-36), WebSocket origin test (AC-34), optimistic-lock test (AC-32), Playwright for AC-27, `buf breaking` (NFR-9), a k6 load test for NFR-1/2 | |
+| CI | GitHub Actions on every push to `main` and every pull request: the API runs `mvn -B -ntp verify` (all unit and integration tests, no secrets: fake LLM, H2); the web app runs `npm ci` and `npm run build` (type-check plus build) | `.github/workflows/ci.yml` in interview-prep-studio-api and interview-prep-studio-web |
+| Not yet in CI | Jobs has no GitHub remote, so its suite still runs locally only | interview-prep-studio-jobs |
+| To add | ArchUnit boundaries (AC-35), Testcontainers Postgres + Kafka (AC-31, AC-36), WebSocket origin test (AC-34), optimistic-lock test (AC-32), Playwright for AC-27, `buf breaking` (NFR-9), a k6 load test for NFR-1/2 | |
 
 Rule: a requirement is **done** when every acceptance criterion it traces to is automated or explicitly marked Manual with a reason.
 
@@ -332,8 +336,21 @@ Rule: a requirement is **done** when every acceptance criterion it traces to is 
 
 If code and spec disagree, the code has a bug or the spec is stale; fix whichever is wrong in the same pull request.
 
+### Accountability
+
+| Control | How it is enforced | Where |
+|---|---|---|
+| Every change is reviewed by its owner | `CODEOWNERS` requests the owner's review on every pull request | `.github/CODEOWNERS` in each repo |
+| Failing criteria can't merge | CI runs every automated criterion on every pull request | `.github/workflows/ci.yml` |
+| Spec changes are visible | This file changes only through a pull request, with the version and §14 updated | this repo |
+| Open gaps have an owner and a reason | §8 lists each gap; closing one means adding the named test | §8 |
+| AI-generated content is checked | The person who merges is accountable for content drafted by Claude or other AI tools: claims are checked against sources or tests before merge, and migrations are generated with length checks matching the column limits | pull request review |
+
+To make the first two binding, turn on branch protection for `main` in each repo: require a pull request, the `CI` status check and a code-owner review.
+
 ## 14. Revision history
 
 | Version | Date | Change |
 |---|---|---|
+| 1.1 | 2026-10-28 | Ownership: owner and code area per requirement in §8, accountability controls in §13. CI added for the API and web repos (§10, AC-33) |
 | 1.0 | 2026-10-25 | Baseline spec of the system as built: glossary, entities, FR-1..15, FR-J1..J5, NFR-1..10, AC-01..46 mapped to tests, 12 gaps |
